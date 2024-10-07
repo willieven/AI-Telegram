@@ -236,8 +236,10 @@ class FTPServer(Thread):
                                 logging.info(f"File {file_path} queued for processing")
                                 conn.send(b'226 Transfer complete, file queued for processing\r\n')
                             else:
-                                conn.send(b'226 Transfer complete (file saved - outside working hours)\r\n')
-                                logging.info(f"File {file_path} saved - outside working hours")
+                                from image_processor import cleanup_files
+                                cleanup_files(file_path, MAIN_FTP_DIRECTORY)
+                                conn.send(b'226 Transfer complete (file deleted - outside working hours)\r\n')
+                                logging.info(f"File {file_path} deleted - outside working hours")
 
                         conn.send(b'226 Transfer complete\r\n')
                     except Exception as e:
