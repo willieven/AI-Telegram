@@ -20,7 +20,7 @@ console.setFormatter(formatter)
 logging.getLogger('').addHandler(console)
 
 # Number of image processing threads
-NUM_IMAGE_PROCESSING_THREADS = 4
+NUM_IMAGE_PROCESSING_THREADS = 12
 
 def create_user_directories():
     for user_id, user_data in USERS.items():

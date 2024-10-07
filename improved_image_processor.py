@@ -2,7 +2,7 @@ import os
 import logging
 import time
 from threading import Thread, Event
-from queue import Queue, Empty
+from queue import Queue, Empty, Full
 import sqlite3
 from datetime import datetime
 import traceback
@@ -32,7 +32,7 @@ class PersistentQueue:
     def put(self, item):
         try:
             self.memory_queue.put_nowait(item)
-        except Queue.Full:
+        except Full:
             self.persist_to_db(item)
 
     def persist_to_db(self, item):
