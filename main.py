@@ -20,7 +20,7 @@ console.setFormatter(formatter)
 logging.getLogger('').addHandler(console)
 
 # Number of image processing threads
-NUM_IMAGE_PROCESSING_THREADS = 12
+NUM_IMAGE_PROCESSING_THREADS = 4
 
 def create_user_directories():
     for user_id, user_data in USERS.items():
@@ -40,7 +40,8 @@ def process_leftover_images(image_queue):
                     logging.info(f"Found leftover image: {file_path}")
     
     if leftover_images:
-        image_queue.put_many(leftover_images)
+        for image in leftover_images:
+            image_queue.put(image)
         logging.info(f"Queued {len(leftover_images)} leftover images for processing")
     else:
         logging.info("No leftover images found")

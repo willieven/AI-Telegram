@@ -2,18 +2,19 @@ import os
 import logging
 import time
 from threading import Thread, Event
-from queue import Empty
+from queue import Queue, Empty
 import sqlite3
 from datetime import datetime
 import traceback
 
-# Assuming these imports are available from your existing code
 from config import MAX_IMAGE_QUEUE, MAIN_FTP_DIRECTORY
 from image_processor import process_image
 
 class PersistentQueue:
-    def __init__(self, db_path):
+    def __init__(self, db_path, max_size):
         self.db_path = db_path
+        self.max_size = max_size
+        self.memory_queue = Queue(maxsize=max_size)
         self.conn = sqlite3.connect(db_path, check_same_thread=False)
         self.create_table()
 
@@ -29,19 +30,25 @@ class PersistentQueue:
             ''')
 
     def put(self, item):
+        try:
+            self.memory_queue.put_nowait(item)
+        except Queue.Full:
+            self.persist_to_db(item)
+
+    def persist_to_db(self, item):
         image_path, user_settings = item
         with self.conn:
             self.conn.execute('INSERT INTO image_queue (image_path, user_settings) VALUES (?, ?)',
                               (image_path, str(user_settings)))
-        logging.info(f"Image {image_path} added to queue")
-
-    def put_many(self, items):
-        with self.conn:
-            self.conn.executemany('INSERT INTO image_queue (image_path, user_settings) VALUES (?, ?)',
-                                  [(item[0], str(item[1])) for item in items])
-        logging.info(f"Bulk inserted {len(items)} images into the queue")
+        logging.info(f"Image {image_path} persisted to database due to full queue")
 
     def get(self):
+        try:
+            return self.memory_queue.get_nowait()
+        except Empty:
+            return self.get_from_db()
+
+    def get_from_db(self):
         with self.conn:
             cursor = self.conn.execute('SELECT id, image_path, user_settings FROM image_queue ORDER BY timestamp ASC LIMIT 1')
             row = cursor.fetchone()
@@ -51,6 +58,9 @@ class PersistentQueue:
         return None
 
     def qsize(self):
+        return self.memory_queue.qsize() + self.db_size()
+
+    def db_size(self):
         with self.conn:
             cursor = self.conn.execute('SELECT COUNT(*) FROM image_queue')
             return cursor.fetchone()[0]
@@ -90,7 +100,7 @@ def monitor_threads(threads, queue, stop_event):
 
 def start_image_processing(num_threads):
     db_path = os.path.join(MAIN_FTP_DIRECTORY, 'image_queue.db')
-    queue = PersistentQueue(db_path)
+    queue = PersistentQueue(db_path, MAX_IMAGE_QUEUE)
     stop_event = Event()
     
     threads = []
