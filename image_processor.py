@@ -7,6 +7,7 @@ import telepot
 import shutil
 from datetime import datetime
 from config import YOLO_MODEL, TELEGRAM_BOT_TOKEN, POSITIVE_PHOTOS_DIRECTORY, SAVE_POSITIVE_PHOTOS, MAIN_FTP_DIRECTORY
+from utils import is_within_working_hours
 
 # Initialize YOLO model
 model = YOLO(YOLO_MODEL)
@@ -77,6 +78,11 @@ def check_vehicle_animal_proximity(vehicles, animals, distance_threshold):
     return False
 
 def process_image(image_path, user_settings):
+    if not is_within_working_hours(user_settings):
+        logging.info(f"Image {image_path} received outside working hours. Deleting without processing.")
+        cleanup_files(image_path, MAIN_FTP_DIRECTORY)
+        return
+
     detections, image = detect_objects(image_path, user_settings)
     if detections is None or image is None:
         logging.error(f"Failed to process image: {image_path}")
