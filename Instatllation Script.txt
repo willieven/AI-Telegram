@@ -1,0 +1,50 @@
+#!/bin/bash
+
+# FTP Server Installation Script
+
+set -e
+
+# Check if script is run as root
+if [ "$EUID" -ne 0 ]; then
+  echo "Please run as root"
+  exit 1
+fi
+
+# Update system and install dependencies
+apt-get update
+apt-get install -y python3 python3-pip git
+
+# Install system dependencies for OpenCV
+apt-get install -y libgl1-mesa-glx libglib2.0-0
+
+# Clone the repository (replace with your actual repository URL)
+git clone https://github.com/yourusername/ftp-server.git /opt/ftp-server
+cd /opt/ftp-server
+
+# Install Python dependencies
+pip3 install -r requirements.txt
+
+# Create a systemd service file
+cat << EOF > /etc/systemd/system/ftp-server.service
+[Unit]
+Description=FTP Server with Image Processing
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 /opt/ftp-server/main.py
+WorkingDirectory=/opt/ftp-server
+Restart=always
+User=root
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+# Reload systemd, enable and start the service
+systemctl daemon-reload
+systemctl enable ftp-server.service
+systemctl start ftp-server.service
+
+echo "FTP Server installation complete. Service is enabled and started."
