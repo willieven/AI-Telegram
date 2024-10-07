@@ -4,6 +4,7 @@ from threading import Thread, Lock
 import logging
 from datetime import datetime
 import time
+import shutil
 from config import USERS, MAIN_FTP_DIRECTORY, FTP_HOST
 from utils import is_within_working_hours
 
@@ -83,6 +84,17 @@ class FTPServer(Thread):
             port_part1, port_part2 = divmod(pasv_port, 256)
             return f'227 Entering Passive Mode ({",".join(ip_parts)},{port_part1},{port_part2})'
 
+        def cleanup_user_directory(user_directory):
+            for item in os.listdir(user_directory):
+                item_path = os.path.join(user_directory, item)
+                if os.path.isfile(item_path):
+                    os.remove(item_path)
+                    logging.info(f"Deleted file: {item_path}")
+                elif os.path.isdir(item_path):
+                    shutil.rmtree(item_path)
+                    logging.info(f"Deleted directory: {item_path}")
+            logging.info(f"Cleaned up contents of user directory: {user_directory}")
+
         while True:
             try:
                 data = conn.recv(1024).decode('utf-8' if utf8_enabled else 'ascii', errors='replace').strip()
@@ -106,6 +118,7 @@ class FTPServer(Thread):
                         user_id, user_settings = USER_LOOKUP[current_user]
                         user_settings = user_settings.copy()
                         user_settings['FTP_DIRECTORY'] = os.path.join(MAIN_FTP_DIRECTORY, user_id)
+                        os.makedirs(user_settings['FTP_DIRECTORY'], exist_ok=True)
                         conn.send(b'230 User logged in, proceed\r\n')
                         with self.session_lock:
                             session = ClientSession(current_user, addr[0])
@@ -132,6 +145,7 @@ class FTPServer(Thread):
                         ' EPRT',
                         ' EPSV',
                         ' ESTP',
+                        ' ALLO',
                         '211 End'
                     ]
                     conn.send('\r\n'.join(features).encode() + b'\r\n')
@@ -232,14 +246,13 @@ class FTPServer(Thread):
                                         break
                                     file.write(chunk)
                             if is_within_working_hours(user_settings):
-                                self.image_queue.put((file_path, user_settings))
-                                logging.info(f"File {file_path} queued for processing")
+                                self.image_queue.put((file_path, user_settings, True))  # Added True flag for deletion after processing
+                                logging.info(f"File {file_path} queued for processing and subsequent deletion")
                                 conn.send(b'226 Transfer complete, file queued for processing\r\n')
                             else:
-                                from image_processor import cleanup_files
-                                cleanup_files(file_path, MAIN_FTP_DIRECTORY)
-                                conn.send(b'226 Transfer complete (file deleted - outside working hours)\r\n')
-                                logging.info(f"File {file_path} deleted - outside working hours")
+                                cleanup_user_directory(user_settings['FTP_DIRECTORY'])
+                                conn.send(b'226 Transfer complete (file and subdirectories deleted - outside working hours)\r\n')
+                                logging.info(f"Contents of {user_settings['FTP_DIRECTORY']} deleted - outside working hours")
 
                         conn.send(b'226 Transfer complete\r\n')
                     except Exception as e:
@@ -376,36 +389,16 @@ class FTPServer(Thread):
                     else:
                         conn.send(b'501 Invalid MFMT command\r\n')
                         logging.warning(f"Invalid MFMT command received from {addr[0]}:{addr[1]}")
-                elif cmd == 'SITE':
-                    site_cmd = arg.split(' ')[0].upper() if arg else ''
-                    if site_cmd == 'CHMOD':
-                        parts = arg.split(' ', 2)
-                        if len(parts) == 3:
-                            mode, filename = parts[1], parts[2]
-                            file_path = os.path.join(user_settings['FTP_DIRECTORY'], current_directory.lstrip('/'), filename)
-                            if os.path.exists(file_path):
-                                try:
-                                    os.chmod(file_path, int(mode, 8))
-                                    conn.send(b'200 CHMOD command successful\r\n')
-                                    logging.info(f"Changed permissions of {file_path} to {mode} by {addr[0]}:{addr[1]}")
-                                except Exception as e:
-                                    conn.send(b'550 CHMOD command failed\r\n')
-                                    logging.error(f"Failed to change permissions of {file_path} by {addr[0]}:{addr[1]}: {str(e)}")
-                            else:
-                                conn.send(b'550 File not found\r\n')
-                                logging.warning(f"File not found for CHMOD: {file_path} for {addr[0]}:{addr[1]}")
-                        else:
-                            conn.send(b'501 Invalid SITE CHMOD command\r\n')
-                            logging.warning(f"Invalid SITE CHMOD command received from {addr[0]}:{addr[1]}")
-                    else:
-                        conn.send(b'504 SITE command not implemented\r\n')
-                        logging.warning(f"Unimplemented SITE command '{site_cmd}' received from {addr[0]}:{addr[1]}")
+                elif cmd == 'ALLO':
+                    conn.send(b'202 ALLO command ignored\r\n')
+                    logging.info(f"ALLO command received from {addr[0]}:{addr[1]}")
                 elif cmd == 'HELP':
                     help_text = [
                         '214-The following commands are recognized:',
                         ' USER PASS QUIT SYST FEAT PWD CWD CDUP TYPE',
                         ' PASV EPSV LIST MLSD NLST STOR RETR MKD RMD DELE',
                         ' SIZE REST RNFR RNTO OPTS MDTM MFMT SITE HELP NOOP',
+                        ' ALLO',
                         '214 Help OK.'
                     ]
                     conn.send('\r\n'.join(help_text).encode() + b'\r\n')
@@ -430,4 +423,4 @@ class FTPServer(Thread):
         logging.info(f"Connection closed for {addr[0]}:{addr[1]}")
 
 def create_ftp_server(host, port, image_queue):
-    return FTPServer(host, port, image_queue)
+    return FTPServer(host, port, image_queue)            

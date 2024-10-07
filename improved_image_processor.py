@@ -25,6 +25,7 @@ class PersistentQueue:
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     image_path TEXT NOT NULL,
                     user_settings TEXT NOT NULL,
+                    delete_after_processing INTEGER NOT NULL,
                     timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
                 )
             ''')
@@ -36,10 +37,10 @@ class PersistentQueue:
             self.persist_to_db(item)
 
     def persist_to_db(self, item):
-        image_path, user_settings = item
+        image_path, user_settings, delete_after_processing = item
         with self.conn:
-            self.conn.execute('INSERT INTO image_queue (image_path, user_settings) VALUES (?, ?)',
-                              (image_path, str(user_settings)))
+            self.conn.execute('INSERT INTO image_queue (image_path, user_settings, delete_after_processing) VALUES (?, ?, ?)',
+                              (image_path, str(user_settings), int(delete_after_processing)))
         logging.info(f"Image {image_path} persisted to database due to full queue")
 
     def get(self):
@@ -50,11 +51,11 @@ class PersistentQueue:
 
     def get_from_db(self):
         with self.conn:
-            cursor = self.conn.execute('SELECT id, image_path, user_settings FROM image_queue ORDER BY timestamp ASC LIMIT 1')
+            cursor = self.conn.execute('SELECT id, image_path, user_settings, delete_after_processing FROM image_queue ORDER BY timestamp ASC LIMIT 1')
             row = cursor.fetchone()
             if row:
                 self.conn.execute('DELETE FROM image_queue WHERE id = ?', (row[0],))
-                return row[1], eval(row[2])  # Convert string back to dict
+                return row[1], eval(row[2]), bool(row[3])
         return None
 
     def qsize(self):
@@ -80,8 +81,8 @@ class ImageProcessorThread(Thread):
                     time.sleep(1)
                     continue
                 
-                image_path, user_settings = item
-                process_image(image_path, user_settings)
+                image_path, user_settings, delete_after_processing = item
+                process_image(image_path, user_settings, delete_after_processing)
             except Empty:
                 time.sleep(1)  # Wait a bit if the queue is empty
             except Exception as e:
