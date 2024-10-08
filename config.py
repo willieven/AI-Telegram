@@ -13,8 +13,12 @@ YOLO_MODEL = 'yolov8l.pt'  # Path to the YOLO model file
 
 # Image Processing Settings
 MAX_IMAGE_QUEUE = 300  # Maximum number of images to queue for processing
-SAVE_POSITIVE_PHOTOS = True  # Server-wide option to save positive detection photos
+SAVE_POSITIVE_PHOTOS = False  # Server-wide option to save positive detection photos
 POSITIVE_PHOTOS_DIRECTORY = '/opt/ftp-server/positive_photos'  # Directory to save positive detection photos
+
+# Watermark Settings
+WATERMARK_TEXT = "Powered by Spoorvat AI"  # Global watermark text template
+
 # User-specific settings
 USERS = {
     'user1': {

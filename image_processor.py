@@ -6,7 +6,7 @@ from ultralytics import YOLO
 import telepot
 import shutil
 from datetime import datetime
-from config import YOLO_MODEL, TELEGRAM_BOT_TOKEN, POSITIVE_PHOTOS_DIRECTORY, SAVE_POSITIVE_PHOTOS, MAIN_FTP_DIRECTORY
+from config import YOLO_MODEL, TELEGRAM_BOT_TOKEN, POSITIVE_PHOTOS_DIRECTORY, SAVE_POSITIVE_PHOTOS, MAIN_FTP_DIRECTORY, WATERMARK_TEXT
 from utils import is_within_working_hours
 
 # Initialize YOLO model
@@ -14,6 +14,32 @@ model = YOLO(YOLO_MODEL)
 
 # Initialize Telegram bot
 bot = telepot.Bot(TELEGRAM_BOT_TOKEN)
+
+def add_watermark(image, username):
+    height, width = image.shape[:2]
+    font = cv2.FONT_HERSHEY_SIMPLEX
+    font_scale = 1
+    font_thickness = 2
+    
+    # Format the watermark text
+    timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    watermark_text = WATERMARK_TEXT.format(username=username, timestamp=timestamp)
+    
+    text_size = cv2.getTextSize(watermark_text, font, font_scale, font_thickness)[0]
+    
+    # Calculate position for bottom-right corner
+    position = (width - text_size[0] - 10, height - 10)
+    
+    # Add semi-transparent background
+    overlay = image.copy()
+    cv2.rectangle(overlay, (position[0] - 5, position[1] - text_size[1] - 5),
+                  (width, height), (0, 0, 0), -1)
+    cv2.addWeighted(overlay, 0.5, image, 0.5, 0, image)
+    
+    # Add text
+    cv2.putText(image, watermark_text, position, font, font_scale, (255, 255, 255), font_thickness)
+    
+    return image
 
 def detect_objects(image_path, user_settings):
     try:
@@ -104,6 +130,10 @@ def process_image(image_path, user_settings, delete_after_processing=False):
             save_positive_photo(image_path, user_settings['FTP_USER'])
 
         marked_image = draw_detections(image.copy(), detections)
+        
+        # Add watermark using the global template
+        marked_image = add_watermark(marked_image, user_settings['FTP_USER'])
+        
         marked_image_path = image_path.replace('.jpg', '_marked.jpg')
         cv2.imwrite(marked_image_path, marked_image)
 
