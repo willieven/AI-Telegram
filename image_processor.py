@@ -63,7 +63,7 @@ def detect_objects(image_path, user_settings):
                     detections['person'].append((box.xyxy[0].tolist(), conf))
                 elif class_name in ['car', 'truck', 'bus', 'vehicle'] and user_settings['ENABLE_VEHICLE_DETECTION'] and conf > user_settings['VEHICLE_CONFIDENCE_THRESHOLD']:
                     detections['vehicle'].append((box.xyxy[0].tolist(), conf))
-                elif class_name in ['cow', 'sheep', 'horse', 'dog', 'cat', 'animal'] and user_settings['ENABLE_VEHICLE_ANIMAL_DETECTION'] and conf > user_settings['ANIMAL_CONFIDENCE_THRESHOLD']:
+                elif class_name in ['cow', 'sheep', 'horse', 'dog', 'cat', 'animal'] and user_settings['ENABLE_ANIMAL_DETECTION'] and conf > user_settings['ANIMAL_CONFIDENCE_THRESHOLD']:
                     detections['animal'].append((box.xyxy[0].tolist(), conf))
         
         return detections, image
@@ -87,22 +87,6 @@ def draw_detections(image, detections):
     
     return image
 
-def check_vehicle_animal_proximity(vehicles, animals, distance_threshold):
-    for vehicle in vehicles:
-        v_x1, v_y1, v_x2, v_y2 = vehicle[0]
-        v_center = ((v_x1 + v_x2) / 2, (v_y1 + v_y2) / 2)
-        
-        for animal in animals:
-            a_x1, a_y1, a_x2, a_y2 = animal[0]
-            a_center = ((a_x1 + a_x2) / 2, (a_y1 + a_y2) / 2)
-            
-            distance = np.sqrt((v_center[0] - a_center[0])**2 + (v_center[1] - a_center[1])**2)
-            
-            if distance < distance_threshold:
-                return True
-    
-    return False
-
 def process_image(image_path, user_settings, delete_after_processing=False):
     if not is_within_working_hours(user_settings):
         logging.info(f"Image {image_path} received outside working hours. Deleting without processing.")
@@ -120,10 +104,8 @@ def process_image(image_path, user_settings, delete_after_processing=False):
         detected_objects.append('person')
     if user_settings['ENABLE_VEHICLE_DETECTION'] and detections['vehicle']:
         detected_objects.append('vehicle')
-    if user_settings['ENABLE_VEHICLE_ANIMAL_DETECTION'] and check_vehicle_animal_proximity(detections['vehicle'],
-                                                                                           detections['animal'],
-                                                                                           user_settings['VEHICLE_ANIMAL_DISTANCE_THRESHOLD']):
-        detected_objects.append('vehicle with animal')
+    if user_settings['ENABLE_ANIMAL_DETECTION'] and detections['animal']:
+        detected_objects.append('animal')
 
     if detected_objects:
         if SAVE_POSITIVE_PHOTOS:
