@@ -300,6 +300,20 @@ USERS = {
         'VEHICLE_ANIMAL_DISTANCE_THRESHOLD': 60,
         'WORKING_START_TIME': '00:00',
         'WORKING_END_TIME': '23:59'
+    },
+    'user21': {
+        'FTP_USER': 'koosboma',
+        'FTP_PASS': 'Werianip1',
+        'TELEGRAM_CHAT_ID': '-1001870975453',
+        'ENABLE_PERSON_DETECTION': True,
+        'ENABLE_VEHICLE_DETECTION': True,
+        'ENABLE_VEHICLE_ANIMAL_DETECTION': True,
+        'PERSON_CONFIDENCE_THRESHOLD': 0.2,
+        'VEHICLE_CONFIDENCE_THRESHOLD': 0.2,
+        'ANIMAL_CONFIDENCE_THRESHOLD': 0.2,
+        'VEHICLE_ANIMAL_DISTANCE_THRESHOLD': 60,
+        'WORKING_START_TIME': '00:00',
+        'WORKING_END_TIME': '23:59'
     }
     # Add more users as needed
 }
