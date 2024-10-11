@@ -17,7 +17,7 @@ SAVE_POSITIVE_PHOTOS = False  # Server-wide option to save positive detection ph
 POSITIVE_PHOTOS_DIRECTORY = '/opt/ftp-server/positive_photos'  # Directory to save positive detection photos
 
 # Watermark Settings
-WATERMARK_TEXT = "Powered by Spoorvat AI"  # Global watermark text template
+GLOBAL_WATERMARK_TEXT = "Powered by Spoorvat AI"  # Global watermark text template
 
 # User-specific settings
 USERS = {
