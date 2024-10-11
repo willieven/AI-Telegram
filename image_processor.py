@@ -33,9 +33,6 @@ ALERT_COOLDOWN = 300  # 5 minutes
 def get_lock(lock_name, expire=60):
     return redis_client.set(f"lock:{lock_name}", "locked", nx=True, ex=expire)
 
-def release_lock(lock_name):
-    redis_client.delete(f"lock:{lock_name}")
-
 def get_last_alert_time(user):
     return redis_client.get(f"last_alert:{user}")
 
@@ -130,8 +127,8 @@ def send_signl4_alert(image_path, detection_message, user_settings):
     ftp_user = user_settings['FTP_USER']
     
     lock_name = f"signl4_alert:{ftp_user}"
-    if not get_lock(lock_name):
-        logging.info(f"Skipping SIGNL4 alert for {ftp_user} - Another alert is being processed")
+    if not get_lock(lock_name, expire=ALERT_COOLDOWN):
+        logging.info(f"Skipping SIGNL4 alert for {ftp_user} - Rate limited or another alert is being processed")
         return
 
     try:
@@ -166,7 +163,7 @@ def send_signl4_alert(image_path, detection_message, user_settings):
     finally:
         if 'Image' in files and hasattr(files['Image'][1], 'close'):
             files['Image'][1].close()
-        release_lock(lock_name)
+        # Note: We're not releasing the lock here. It will expire after ALERT_COOLDOWN seconds.
 
 def process_image(image_path, user_settings, delete_after_processing=False):
     logging.info(f"Starting to process image: {image_path}")
