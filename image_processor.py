@@ -9,7 +9,7 @@ from datetime import datetime
 import requests
 import time
 import threading
-from config import YOLO_MODEL, TELEGRAM_BOT_TOKEN, POSITIVE_PHOTOS_DIRECTORY, SAVE_POSITIVE_PHOTOS, MAIN_FTP_DIRECTORY, WATERMARK_TEXT
+from config import YOLO_MODEL, TELEGRAM_BOT_TOKEN, POSITIVE_PHOTOS_DIRECTORY, SAVE_POSITIVE_PHOTOS, MAIN_FTP_DIRECTORY, GLOBAL_WATERMARK_TEXT
 from utils import is_within_working_hours
 
 # Initialize YOLO model
@@ -22,7 +22,7 @@ bot = telepot.Bot(TELEGRAM_BOT_TOKEN)
 last_alert_time = {}
 alert_lock = threading.Lock()
 
-def add_watermark(image, username):
+def add_watermark(image, user_settings):
     height, width = image.shape[:2]
     font = cv2.FONT_HERSHEY_SIMPLEX
     font_scale = 1
@@ -30,7 +30,10 @@ def add_watermark(image, username):
     
     # Format the watermark text
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-    watermark_text = WATERMARK_TEXT.format(username=username, timestamp=timestamp)
+    
+    # Use user-specific watermark if available, otherwise use global watermark
+    watermark_text = user_settings.get('WATERMARK_TEXT', GLOBAL_WATERMARK_TEXT)
+    watermark_text = watermark_text.format(username=user_settings['FTP_USER'], timestamp=timestamp)
     
     text_size = cv2.getTextSize(watermark_text, font, font_scale, font_thickness)[0]
     
@@ -164,7 +167,7 @@ def process_image(image_path, user_settings, delete_after_processing=False):
             save_positive_photo(image_path, user_settings['FTP_USER'])
 
         marked_image = draw_detections(image.copy(), detections)
-        marked_image = add_watermark(marked_image, user_settings['FTP_USER'])
+        marked_image = add_watermark(marked_image, user_settings)
         marked_image_path = image_path.replace('.jpg', '_marked.jpg')
         cv2.imwrite(marked_image_path, marked_image)
 

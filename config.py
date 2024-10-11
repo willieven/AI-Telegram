@@ -300,6 +300,7 @@ USERS = {
         'FTP_USER': 'zimbi',
         'FTP_PASS': 'zimbi123',
         'TELEGRAM_CHAT_ID': '-1002389227208',
+        'SIGNL4_SECRET': 'https://connect.signl4.com/webhook/qi773gtvnb',
         'ENABLE_PERSON_DETECTION': True,
         'ENABLE_VEHICLE_DETECTION': False,
         'ENABLE_ANIMAL_DETECTION': False,
@@ -307,7 +308,8 @@ USERS = {
         'VEHICLE_CONFIDENCE_THRESHOLD': 0.2,
         'ANIMAL_CONFIDENCE_THRESHOLD': 0.2,
         'WORKING_START_TIME': '00:00',
-        'WORKING_END_TIME': '23:59'
+        'WORKING_END_TIME': '23:59',
+        'WATERMARK_TEXT': "Powered by ZimBot"  # User-specific watermark
     }
 }
 
