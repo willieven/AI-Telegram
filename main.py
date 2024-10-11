@@ -83,7 +83,7 @@ def process_leftover_images(image_queue):
             for file in files:
                 if file.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
                     file_path = os.path.join(root, file)
-                    leftover_images.append((file_path, user_data))
+                    leftover_images.append((file_path, user_data, True))  # Add True for delete_after_processing
                     logger.info(f"Found leftover image: {file_path}")
     
     if leftover_images:

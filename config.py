@@ -19,6 +19,11 @@ POSITIVE_PHOTOS_DIRECTORY = '/opt/ftp-server/positive_photos'  # Directory to sa
 # Watermark Settings
 GLOBAL_WATERMARK_TEXT = "Powered by Spoorvat AI"  # Global watermark text template
 
+# Redis Configuration
+REDIS_HOST = 'localhost'  # Change this to your Redis server host if different
+REDIS_PORT = 6379
+REDIS_PASSWORD = 'As836sjdg26HTTg277'  # Set this to your Redis password
+
 # User-specific settings
 USERS = {
     'user1': {
@@ -158,7 +163,7 @@ USERS = {
         'TELEGRAM_CHAT_ID': '-1001969769395',
         'ENABLE_PERSON_DETECTION': True,
         'ENABLE_VEHICLE_DETECTION': True,
-        'ENABLE_ANIMAL_DETECTION': True,
+        'ENABLE_ANIMAL_DETECTION': False,
         'PERSON_CONFIDENCE_THRESHOLD': 0.4,
         'VEHICLE_CONFIDENCE_THRESHOLD': 0.4,
         'ANIMAL_CONFIDENCE_THRESHOLD': 0.2,
@@ -259,7 +264,7 @@ USERS = {
     },
     'user19': {
         'FTP_USER': 'danie',
-        'FTP_PASS': 'danie12345',
+        'FTP_PASS': 'danie1234',
         'TELEGRAM_CHAT_ID': '-1002347900410',
         'ENABLE_PERSON_DETECTION': True,
         'ENABLE_VEHICLE_DETECTION': True,

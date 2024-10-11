@@ -81,7 +81,15 @@ class ImageProcessorThread(Thread):
                     time.sleep(1)
                     continue
                 
-                image_path, user_settings, delete_after_processing = item
+                if len(item) == 3:
+                    image_path, user_settings, delete_after_processing = item
+                elif len(item) == 2:
+                    image_path, user_settings = item
+                    delete_after_processing = True  # Default to True if not specified
+                else:
+                    logging.error(f"Invalid item format in queue: {item}")
+                    continue
+                
                 process_image(image_path, user_settings, delete_after_processing)
             except Empty:
                 time.sleep(1)  # Wait a bit if the queue is empty

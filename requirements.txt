@@ -3,3 +3,4 @@ numpy
 ultralytics
 telepot
 requests
+redis

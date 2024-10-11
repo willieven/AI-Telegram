@@ -9,8 +9,17 @@ from datetime import datetime
 import requests
 import time
 import threading
-from config import YOLO_MODEL, TELEGRAM_BOT_TOKEN, POSITIVE_PHOTOS_DIRECTORY, SAVE_POSITIVE_PHOTOS, MAIN_FTP_DIRECTORY, GLOBAL_WATERMARK_TEXT
+import json
+from pathlib import Path
+import fcntl
+import sys
+import redis
+
+from config import YOLO_MODEL, TELEGRAM_BOT_TOKEN, POSITIVE_PHOTOS_DIRECTORY, SAVE_POSITIVE_PHOTOS, MAIN_FTP_DIRECTORY, GLOBAL_WATERMARK_TEXT, REDIS_HOST, REDIS_PORT, REDIS_PASSWORD
 from utils import is_within_working_hours
+
+# Initialize Redis client
+redis_client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, password=REDIS_PASSWORD, decode_responses=True)
 
 # Initialize YOLO model
 model = YOLO(YOLO_MODEL)
@@ -18,9 +27,29 @@ model = YOLO(YOLO_MODEL)
 # Initialize Telegram bot
 bot = telepot.Bot(TELEGRAM_BOT_TOKEN)
 
-# Dictionary to store the last alert time for each user
-last_alert_time = {}
-alert_lock = threading.Lock()
+# SIGNL4 alert rate limiting
+ALERT_COOLDOWN = 300  # 5 minutes
+
+def get_lock(lock_name, expire=60):
+    return redis_client.set(f"lock:{lock_name}", "locked", nx=True, ex=expire)
+
+def release_lock(lock_name):
+    redis_client.delete(f"lock:{lock_name}")
+
+def get_last_alert_time(user):
+    return redis_client.get(f"last_alert:{user}")
+
+def set_last_alert_time(user, timestamp):
+    redis_client.set(f"last_alert:{user}", timestamp)
+
+def ensure_single_instance():
+    global lock_file
+    lock_file = open("/tmp/ai_telegram_lock", "w")
+    try:
+        fcntl.lockf(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except IOError:
+        print("Another instance is already running. Exiting.")
+        sys.exit(1)
 
 def add_watermark(image, user_settings):
     height, width = image.shape[:2]
@@ -28,25 +57,20 @@ def add_watermark(image, user_settings):
     font_scale = 1
     font_thickness = 2
     
-    # Format the watermark text
     timestamp = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
     
-    # Use user-specific watermark if available, otherwise use global watermark
     watermark_text = user_settings.get('WATERMARK_TEXT', GLOBAL_WATERMARK_TEXT)
     watermark_text = watermark_text.format(username=user_settings['FTP_USER'], timestamp=timestamp)
     
     text_size = cv2.getTextSize(watermark_text, font, font_scale, font_thickness)[0]
     
-    # Calculate position for bottom-right corner
     position = (width - text_size[0] - 10, height - 10)
     
-    # Add semi-transparent background
     overlay = image.copy()
     cv2.rectangle(overlay, (position[0] - 5, position[1] - text_size[1] - 5),
                   (width, height), (0, 0, 0), -1)
     cv2.addWeighted(overlay, 0.5, image, 0.5, 0, image)
     
-    # Add text
     cv2.putText(image, watermark_text, position, font, font_scale, (255, 255, 255), font_thickness)
     
     return image
@@ -98,7 +122,6 @@ def draw_detections(image, detections):
     return image
 
 def send_signl4_alert(image_path, detection_message, user_settings):
-    # Check if the user has a SIGNL4 secret
     if 'SIGNL4_SECRET' not in user_settings or not user_settings['SIGNL4_SECRET']:
         logging.info(f"Skipping SIGNL4 alert for {user_settings['FTP_USER']} - No SIGNL4 secret configured")
         return
@@ -106,43 +129,49 @@ def send_signl4_alert(image_path, detection_message, user_settings):
     current_time = time.time()
     ftp_user = user_settings['FTP_USER']
     
-    with alert_lock:
-        # Check if 5 minutes have passed since the last alert for this user
-        if ftp_user in last_alert_time and current_time - last_alert_time[ftp_user] < 300:
+    lock_name = f"signl4_alert:{ftp_user}"
+    if not get_lock(lock_name):
+        logging.info(f"Skipping SIGNL4 alert for {ftp_user} - Another alert is being processed")
+        return
+
+    try:
+        last_alert = get_last_alert_time(ftp_user)
+        if last_alert and current_time - float(last_alert) < ALERT_COOLDOWN:
             logging.info(f"Skipping SIGNL4 alert for {ftp_user} due to rate limiting")
             return
 
-        try:
-            # Prepare the multipart form data
-            files = {
-                'Image': ('image.jpg', open(image_path, 'rb'), 'image/jpeg')
-            }
-            data = {
-                'Title': f"AI Detection Alert for {ftp_user}",
-                'Message': detection_message,
-                'Severity': 'High'
-            }
+        files = {
+            'Image': ('image.jpg', open(image_path, 'rb'), 'image/jpeg')
+        }
+        data = {
+            'Title': f"Intrusion Detection Alert for {ftp_user}",
+            'Message': detection_message,
+            'Severity': 'High'
+        }
 
-            # Send the alert to SIGNL4
-            response = requests.post(
-                user_settings['SIGNL4_SECRET'],
-                files=files,
-                data=data
-            )
+        response = requests.post(
+            user_settings['SIGNL4_SECRET'],
+            files=files,
+            data=data
+        )
 
-            if response.status_code == 200:
-                logging.info(f"SIGNL4 alert sent successfully for {ftp_user}")
-                last_alert_time[ftp_user] = current_time
-            else:
-                logging.error(f"Failed to send SIGNL4 alert for {ftp_user}: {response.text}")
+        if response.status_code == 200:
+            logging.info(f"SIGNL4 alert sent successfully for {ftp_user}")
+            set_last_alert_time(ftp_user, str(current_time))
+        else:
+            logging.error(f"Failed to send SIGNL4 alert for {ftp_user}: {response.text}")
 
-        except Exception as e:
-            logging.error(f"Error sending SIGNL4 alert for {ftp_user}: {str(e)}")
-        finally:
-            # Ensure the file is closed
+    except Exception as e:
+        logging.error(f"Error sending SIGNL4 alert for {ftp_user}: {str(e)}")
+    finally:
+        if 'Image' in files and hasattr(files['Image'][1], 'close'):
             files['Image'][1].close()
+        release_lock(lock_name)
 
 def process_image(image_path, user_settings, delete_after_processing=False):
+    logging.info(f"Starting to process image: {image_path}")
+    logging.info(f"User settings: {user_settings}")
+
     if not is_within_working_hours(user_settings):
         logging.info(f"Image {image_path} received outside working hours. Deleting without processing.")
         cleanup_files(image_path, MAIN_FTP_DIRECTORY)
@@ -174,7 +203,6 @@ def process_image(image_path, user_settings, delete_after_processing=False):
         detection_message = f"Detected: {', '.join(detected_objects)}"
         send_telegram_image(marked_image_path, detection_message, user_settings['TELEGRAM_CHAT_ID'])
         
-        # Send SIGNL4 alert (will be skipped if no SIGNL4 secret is configured)
         send_signl4_alert(marked_image_path, detection_message, user_settings)
 
         logging.info(f"{detection_message} in {image_path}. Marked image sent to Telegram and SIGNL4 (if configured).")
@@ -189,12 +217,13 @@ def process_image(image_path, user_settings, delete_after_processing=False):
     else:
         logging.info(f"Retained processed file: {image_path}")
 
+    logging.info(f"Finished processing image: {image_path}")
+
 def cleanup_files(file_path, base_directory):
     if os.path.exists(file_path):
         os.remove(file_path)
         logging.info(f"Deleted file: {file_path}")
     
-    # Clean up empty directories
     directory = os.path.dirname(file_path)
     while directory != base_directory:
         if not os.listdir(directory):
@@ -225,3 +254,12 @@ def save_positive_photo(image_path, username):
         logging.info(f"Original image with positive detection saved: {new_path}")
     except Exception as e:
         logging.error(f"Error saving original image with positive detection: {str(e)}")
+
+# Ensure single instance is running
+ensure_single_instance()
+
+# If this script is run directly, you might want to add some initialization or testing code here
+if __name__ == "__main__":
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+    logging.info("Image processor initialized and ready.")
+    # You could add some test code here if needed
