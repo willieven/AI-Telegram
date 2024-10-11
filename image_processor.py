@@ -8,6 +8,7 @@ import shutil
 from datetime import datetime
 import requests
 import time
+import threading
 from config import YOLO_MODEL, TELEGRAM_BOT_TOKEN, POSITIVE_PHOTOS_DIRECTORY, SAVE_POSITIVE_PHOTOS, MAIN_FTP_DIRECTORY, WATERMARK_TEXT
 from utils import is_within_working_hours
 
@@ -19,6 +20,7 @@ bot = telepot.Bot(TELEGRAM_BOT_TOKEN)
 
 # Dictionary to store the last alert time for each user
 last_alert_time = {}
+alert_lock = threading.Lock()
 
 def add_watermark(image, username):
     height, width = image.shape[:2]
@@ -101,40 +103,41 @@ def send_signl4_alert(image_path, detection_message, user_settings):
     current_time = time.time()
     ftp_user = user_settings['FTP_USER']
     
-    # Check if 5 minutes have passed since the last alert for this user
-    if ftp_user in last_alert_time and current_time - last_alert_time[ftp_user] < 300:
-        logging.info(f"Skipping SIGNL4 alert for {ftp_user} due to rate limiting")
-        return
+    with alert_lock:
+        # Check if 5 minutes have passed since the last alert for this user
+        if ftp_user in last_alert_time and current_time - last_alert_time[ftp_user] < 300:
+            logging.info(f"Skipping SIGNL4 alert for {ftp_user} due to rate limiting")
+            return
 
-    try:
-        # Prepare the multipart form data
-        files = {
-            'Image': ('image.jpg', open(image_path, 'rb'), 'image/jpeg')
-        }
-        data = {
-            'Title': f"AI Detection Alert for {ftp_user}",
-            'Message': detection_message,
-            'Severity': 'High'
-        }
+        try:
+            # Prepare the multipart form data
+            files = {
+                'Image': ('image.jpg', open(image_path, 'rb'), 'image/jpeg')
+            }
+            data = {
+                'Title': f"AI Detection Alert for {ftp_user}",
+                'Message': detection_message,
+                'Severity': 'High'
+            }
 
-        # Send the alert to SIGNL4
-        response = requests.post(
-            user_settings['SIGNL4_SECRET'],
-            files=files,
-            data=data
-        )
+            # Send the alert to SIGNL4
+            response = requests.post(
+                user_settings['SIGNL4_SECRET'],
+                files=files,
+                data=data
+            )
 
-        if response.status_code == 200:
-            logging.info(f"SIGNL4 alert sent successfully for {ftp_user}")
-            last_alert_time[ftp_user] = current_time
-        else:
-            logging.error(f"Failed to send SIGNL4 alert for {ftp_user}: {response.text}")
+            if response.status_code == 200:
+                logging.info(f"SIGNL4 alert sent successfully for {ftp_user}")
+                last_alert_time[ftp_user] = current_time
+            else:
+                logging.error(f"Failed to send SIGNL4 alert for {ftp_user}: {response.text}")
 
-    except Exception as e:
-        logging.error(f"Error sending SIGNL4 alert for {ftp_user}: {str(e)}")
-    finally:
-        # Ensure the file is closed
-        files['Image'][1].close()
+        except Exception as e:
+            logging.error(f"Error sending SIGNL4 alert for {ftp_user}: {str(e)}")
+        finally:
+            # Ensure the file is closed
+            files['Image'][1].close()
 
 def process_image(image_path, user_settings, delete_after_processing=False):
     if not is_within_working_hours(user_settings):
