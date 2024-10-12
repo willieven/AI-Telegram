@@ -9,7 +9,7 @@ from config import USERS, FTP_HOST, FTP_PORT, MAIN_FTP_DIRECTORY, MAX_IMAGE_QUEU
 from ftp_server import create_ftp_server
 from improved_image_processor import start_image_processing_system, shutdown_image_processing
 from telepot.loop import MessageLoop
-from image_processor import bot, handle_telegram_command
+from image_processor import bot, handle_telegram_command, check_and_auto_arm, redis_client, set_armed_status
 
 # Number of image processing threads
 NUM_IMAGE_PROCESSING_THREADS = 12
@@ -95,6 +95,25 @@ def process_leftover_images(image_queue):
     else:
         logger.info("No leftover images found")
 
+def auto_arm_checker():
+    while True:
+        for user, user_settings in USERS.items():
+            check_and_auto_arm(user, user_settings)
+        time.sleep(60)  # Check every minute
+
+def start_telegram_handler():
+    message_loop = MessageLoop(bot, handle_telegram_command)
+    message_loop_thread = Thread(target=message_loop.run_forever, name="TelegramBot")
+    message_loop_thread.daemon = True
+    message_loop_thread.start()
+    return message_loop_thread
+
+def initialize_redis_armed_status():
+    for user, user_settings in USERS.items():
+        if redis_client.get(f"user_armed_status:{user}") is None:
+            set_armed_status(user, user_settings['ARMED'])
+            logger.info(f"Initialized armed status for user {user} in Redis")
+
 def main():
     # Create main FTP directory if it doesn't exist
     os.makedirs(MAIN_FTP_DIRECTORY, exist_ok=True)
@@ -102,6 +121,9 @@ def main():
     
     # Create user directories
     create_user_directories()
+    
+    # Initialize Redis armed status
+    initialize_redis_armed_status()
     
     # Start the image processing system
     image_queue, stop_event = start_image_processing_system(NUM_IMAGE_PROCESSING_THREADS)
@@ -125,8 +147,14 @@ def main():
     logger.info(f"Positive photos directory verified: {POSITIVE_PHOTOS_DIRECTORY}")
     
     # Start the Telegram message handler
-    MessageLoop(bot, handle_telegram_command).run_as_thread()
+    telegram_thread = start_telegram_handler()
     logger.info("Telegram message handler started")
+    
+    # Start the auto-arm checker
+    auto_arm_thread = Thread(target=auto_arm_checker, name="AutoArmChecker")
+    auto_arm_thread.daemon = True
+    auto_arm_thread.start()
+    logger.info("Auto-arm checker started")
     
     logger.info("Main thread is now waiting. Press Ctrl+C to stop the server.")
     try:

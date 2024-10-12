@@ -6,7 +6,7 @@ from ultralytics import YOLO
 import telepot
 from telepot.loop import MessageLoop
 import shutil
-from datetime import datetime
+from datetime import datetime, time
 import requests
 import time
 import threading
@@ -52,11 +52,38 @@ def ensure_single_instance():
 def get_armed_status(user):
     key = f"{REDIS_ARMED_KEY_PREFIX}{user}"
     status = redis_client.get(key)
-    return status.lower() == 'true' if status else USERS[user]['ARMED']
+    if status is None:
+        logging.info(f"Armed status for user {user} not found in Redis, using default from config.")
+        return USERS[user]['ARMED']
+    else:
+        logging.info(f"Retrieved armed status for user {user} from Redis: {status.lower() == 'true'}")
+        return status.lower() == 'true'
 
 def set_armed_status(user, status):
     key = f"{REDIS_ARMED_KEY_PREFIX}{user}"
     redis_client.set(key, str(status).lower())
+
+def check_and_auto_arm(user, user_settings):
+    current_time = datetime.now().time()
+    start_time = datetime.strptime(user_settings['WORKING_START_TIME'], '%H:%M').time()
+    end_time = datetime.strptime(user_settings['WORKING_END_TIME'], '%H:%M').time()
+    
+    is_working_hours = False
+    if start_time <= end_time:
+        is_working_hours = start_time <= current_time <= end_time
+    else:  # Working hours go past midnight
+        is_working_hours = current_time >= start_time or current_time <= end_time
+    
+    current_armed_status = get_armed_status(user)
+    
+    if is_working_hours and not current_armed_status:
+        set_armed_status(user, True)
+        message = f"System auto-armed for user {user} as working hours have started."
+        logging.info(message)
+        bot.sendMessage(user_settings['TELEGRAM_CHAT_ID'], message)
+        return True
+    
+    return False
 
 def handle_telegram_command(msg):
     content_type, chat_type, chat_id = telepot.glance(msg)
@@ -80,8 +107,13 @@ def handle_telegram_command(msg):
     elif command == '/status':
         status = "armed" if get_armed_status(user) else "disarmed"
         bot.sendMessage(chat_id, f"System is currently {status}.")
+    elif command == '/autoarm':
+        if check_and_auto_arm(user, USERS[user]):
+            bot.sendMessage(chat_id, "System has been auto-armed as it's within working hours.")
+        else:
+            bot.sendMessage(chat_id, "Auto-arm check performed, but no action was needed.")
     else:
-        bot.sendMessage(chat_id, "Unknown command. Available commands: /arm, /disarm, /status")
+        bot.sendMessage(chat_id, "Unknown command. Available commands: /arm, /disarm, /status, /autoarm")
 
 def add_watermark(image, user_settings):
     height, width = image.shape[:2]
