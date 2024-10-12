@@ -8,6 +8,8 @@ import sqlite3
 from config import USERS, FTP_HOST, FTP_PORT, MAIN_FTP_DIRECTORY, MAX_IMAGE_QUEUE, POSITIVE_PHOTOS_DIRECTORY
 from ftp_server import create_ftp_server
 from improved_image_processor import start_image_processing_system, shutdown_image_processing
+from telepot.loop import MessageLoop
+from image_processor import bot, handle_telegram_command
 
 # Number of image processing threads
 NUM_IMAGE_PROCESSING_THREADS = 12
@@ -121,6 +123,10 @@ def main():
     # Create positive_photos directory
     os.makedirs(POSITIVE_PHOTOS_DIRECTORY, exist_ok=True)
     logger.info(f"Positive photos directory verified: {POSITIVE_PHOTOS_DIRECTORY}")
+    
+    # Start the Telegram message handler
+    MessageLoop(bot, handle_telegram_command).run_as_thread()
+    logger.info("Telegram message handler started")
     
     logger.info("Main thread is now waiting. Press Ctrl+C to stop the server.")
     try:

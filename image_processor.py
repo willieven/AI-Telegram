@@ -4,6 +4,7 @@ import cv2
 import numpy as np
 from ultralytics import YOLO
 import telepot
+from telepot.loop import MessageLoop
 import shutil
 from datetime import datetime
 import requests
@@ -15,7 +16,7 @@ import fcntl
 import sys
 import redis
 
-from config import YOLO_MODEL, TELEGRAM_BOT_TOKEN, POSITIVE_PHOTOS_DIRECTORY, SAVE_POSITIVE_PHOTOS, MAIN_FTP_DIRECTORY, GLOBAL_WATERMARK_TEXT, REDIS_HOST, REDIS_PORT, REDIS_PASSWORD
+from config import YOLO_MODEL, TELEGRAM_BOT_TOKEN, POSITIVE_PHOTOS_DIRECTORY, SAVE_POSITIVE_PHOTOS, MAIN_FTP_DIRECTORY, GLOBAL_WATERMARK_TEXT, REDIS_HOST, REDIS_PORT, REDIS_PASSWORD, USERS, REDIS_ARMED_KEY_PREFIX
 from utils import is_within_working_hours
 
 # Initialize Redis client
@@ -47,6 +48,40 @@ def ensure_single_instance():
     except IOError:
         print("Another instance is already running. Exiting.")
         sys.exit(1)
+
+def get_armed_status(user):
+    key = f"{REDIS_ARMED_KEY_PREFIX}{user}"
+    status = redis_client.get(key)
+    return status.lower() == 'true' if status else USERS[user]['ARMED']
+
+def set_armed_status(user, status):
+    key = f"{REDIS_ARMED_KEY_PREFIX}{user}"
+    redis_client.set(key, str(status).lower())
+
+def handle_telegram_command(msg):
+    content_type, chat_type, chat_id = telepot.glance(msg)
+    
+    if content_type != 'text':
+        return
+
+    command = msg['text'].lower()
+    user = next((user for user, data in USERS.items() if str(data['TELEGRAM_CHAT_ID']) == str(chat_id)), None)
+
+    if not user:
+        bot.sendMessage(chat_id, "Unauthorized user.")
+        return
+
+    if command == '/arm':
+        set_armed_status(user, True)
+        bot.sendMessage(chat_id, "System armed. Images will be processed.")
+    elif command == '/disarm':
+        set_armed_status(user, False)
+        bot.sendMessage(chat_id, "System disarmed. Images will be discarded.")
+    elif command == '/status':
+        status = "armed" if get_armed_status(user) else "disarmed"
+        bot.sendMessage(chat_id, f"System is currently {status}.")
+    else:
+        bot.sendMessage(chat_id, "Unknown command. Available commands: /arm, /disarm, /status")
 
 def add_watermark(image, user_settings):
     height, width = image.shape[:2]
@@ -163,11 +198,22 @@ def send_signl4_alert(image_path, detection_message, user_settings):
     finally:
         if 'Image' in files and hasattr(files['Image'][1], 'close'):
             files['Image'][1].close()
-        # Note: We're not releasing the lock here. It will expire after ALERT_COOLDOWN seconds.
 
 def process_image(image_path, user_settings, delete_after_processing=False):
     logging.info(f"Starting to process image: {image_path}")
     logging.info(f"User settings: {user_settings}")
+
+    user = next((user for user, data in USERS.items() if data['FTP_USER'] == user_settings['FTP_USER']), None)
+    
+    if not user:
+        logging.error(f"User not found for FTP_USER: {user_settings['FTP_USER']}")
+        cleanup_files(image_path, MAIN_FTP_DIRECTORY)
+        return
+
+    if not get_armed_status(user):
+        logging.info(f"System disarmed for user {user}. Discarding image: {image_path}")
+        cleanup_files(image_path, MAIN_FTP_DIRECTORY)
+        return
 
     if not is_within_working_hours(user_settings):
         logging.info(f"Image {image_path} received outside working hours. Deleting without processing.")
@@ -255,8 +301,14 @@ def save_positive_photo(image_path, username):
 # Ensure single instance is running
 ensure_single_instance()
 
+# Start Telegram message handler
+MessageLoop(bot, handle_telegram_command).run_as_thread()
+
 # If this script is run directly, you might want to add some initialization or testing code here
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     logging.info("Image processor initialized and ready.")
-    # You could add some test code here if needed
+    
+    # Keep the script running
+    while True:
+        time.sleep(10)

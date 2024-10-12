@@ -23,6 +23,7 @@ GLOBAL_WATERMARK_TEXT = "Powered by Spoorvat AI"  # Global watermark text templa
 REDIS_HOST = 'localhost'  # Change this to your Redis server host if different
 REDIS_PORT = 6379
 REDIS_PASSWORD = 'As836sjdg26HTTg277'  # Set this to your Redis password
+REDIS_ARMED_KEY_PREFIX = "user_armed_status:"  # Prefix for storing armed status in Redis
 
 # User-specific settings
 USERS = {
@@ -38,7 +39,8 @@ USERS = {
         'VEHICLE_CONFIDENCE_THRESHOLD': 0.3,
         'ANIMAL_CONFIDENCE_THRESHOLD': 0.2,
         'WORKING_START_TIME': '19:00',
-        'WORKING_END_TIME': '05:00'
+        'WORKING_END_TIME': '05:00',
+        'ARMED': True  # Default armed status
     },
     'user2': {
         'FTP_USER': 'naboom',
@@ -51,7 +53,8 @@ USERS = {
         'VEHICLE_CONFIDENCE_THRESHOLD': 0.4,
         'ANIMAL_CONFIDENCE_THRESHOLD': 0.2,
         'WORKING_START_TIME': '19:00',
-        'WORKING_END_TIME': '05:00'
+        'WORKING_END_TIME': '05:00',
+        'ARMED': True
     },
     'user3': {
         'FTP_USER': 'spoorvat',
@@ -64,7 +67,8 @@ USERS = {
         'VEHICLE_CONFIDENCE_THRESHOLD': 0.4,
         'ANIMAL_CONFIDENCE_THRESHOLD': 0.2,
         'WORKING_START_TIME': '00:00',
-        'WORKING_END_TIME': '23:59'
+        'WORKING_END_TIME': '23:59',
+        'ARMED': True
     },
     'user4': {
         'FTP_USER': 'shumbas',
@@ -77,7 +81,8 @@ USERS = {
         'VEHICLE_CONFIDENCE_THRESHOLD': 0.4,
         'ANIMAL_CONFIDENCE_THRESHOLD': 0.2,
         'WORKING_START_TIME': '00:00',
-        'WORKING_END_TIME': '23:59'
+        'WORKING_END_TIME': '23:59',
+        'ARMED': True
     },
     'user5': {
         'FTP_USER': 'dlu',
@@ -90,7 +95,8 @@ USERS = {
         'VEHICLE_CONFIDENCE_THRESHOLD': 0.4,
         'ANIMAL_CONFIDENCE_THRESHOLD': 0.2,
         'WORKING_START_TIME': '00:00',
-        'WORKING_END_TIME': '23:59'
+        'WORKING_END_TIME': '23:59',
+        'ARMED': True
     },
     'user6': {
         'FTP_USER': 'hendrik',
@@ -103,7 +109,8 @@ USERS = {
         'VEHICLE_CONFIDENCE_THRESHOLD': 0.4,
         'ANIMAL_CONFIDENCE_THRESHOLD': 0.2,
         'WORKING_START_TIME': '00:00',
-        'WORKING_END_TIME': '23:59'
+        'WORKING_END_TIME': '23:59',
+        'ARMED': True
     },
     'user7': {
         'FTP_USER': 'dlu2',
@@ -116,7 +123,8 @@ USERS = {
         'VEHICLE_CONFIDENCE_THRESHOLD': 0.4,
         'ANIMAL_CONFIDENCE_THRESHOLD': 0.2,
         'WORKING_START_TIME': '00:00',
-        'WORKING_END_TIME': '23:59'
+        'WORKING_END_TIME': '23:59',
+        'ARMED': True
     },
     'user8': {
         'FTP_USER': 'gpf',
@@ -129,7 +137,8 @@ USERS = {
         'VEHICLE_CONFIDENCE_THRESHOLD': 0.4,
         'ANIMAL_CONFIDENCE_THRESHOLD': 0.2,
         'WORKING_START_TIME': '00:00',
-        'WORKING_END_TIME': '23:59'
+        'WORKING_END_TIME': '23:59',
+        'ARMED': True
     },
     'user9': {
         'FTP_USER': 'gpf2',
@@ -142,7 +151,8 @@ USERS = {
         'VEHICLE_CONFIDENCE_THRESHOLD': 0.4,
         'ANIMAL_CONFIDENCE_THRESHOLD': 0.2,
         'WORKING_START_TIME': '00:00',
-        'WORKING_END_TIME': '23:59'
+        'WORKING_END_TIME': '23:59',
+        'ARMED': True
     },
     'user10': {
         'FTP_USER': 'roedtan',
@@ -155,7 +165,8 @@ USERS = {
         'VEHICLE_CONFIDENCE_THRESHOLD': 0.4,
         'ANIMAL_CONFIDENCE_THRESHOLD': 0.2,
         'WORKING_START_TIME': '00:00',
-        'WORKING_END_TIME': '23:59'
+        'WORKING_END_TIME': '23:59',
+        'ARMED': True
     },
     'user11': {
         'FTP_USER': 'hanglip',
@@ -168,7 +179,8 @@ USERS = {
         'VEHICLE_CONFIDENCE_THRESHOLD': 0.4,
         'ANIMAL_CONFIDENCE_THRESHOLD': 0.2,
         'WORKING_START_TIME': '00:00',
-        'WORKING_END_TIME': '23:59'
+        'WORKING_END_TIME': '23:59',
+        'ARMED': True
     },
     'user12': {
         'FTP_USER': 'crecy',
@@ -181,7 +193,8 @@ USERS = {
         'VEHICLE_CONFIDENCE_THRESHOLD': 0.4,
         'ANIMAL_CONFIDENCE_THRESHOLD': 0.2,
         'WORKING_START_TIME': '00:00',
-        'WORKING_END_TIME': '23:59'
+        'WORKING_END_TIME': '23:59',
+        'ARMED': True
     },
     'user13': {
         'FTP_USER': 'nyl',
@@ -194,7 +207,8 @@ USERS = {
         'VEHICLE_CONFIDENCE_THRESHOLD': 0.4,
         'ANIMAL_CONFIDENCE_THRESHOLD': 0.2,
         'WORKING_START_TIME': '00:00',
-        'WORKING_END_TIME': '23:59'
+        'WORKING_END_TIME': '23:59',
+        'ARMED': True
     },
     'user14': {
         'FTP_USER': 'single',
@@ -207,7 +221,8 @@ USERS = {
         'VEHICLE_CONFIDENCE_THRESHOLD': 0.4,
         'ANIMAL_CONFIDENCE_THRESHOLD': 0.2,
         'WORKING_START_TIME': '00:00',
-        'WORKING_END_TIME': '23:59'
+        'WORKING_END_TIME': '23:59',
+        'ARMED': True
     },
     'user15': {
         'FTP_USER': 'sterkover',
@@ -220,7 +235,8 @@ USERS = {
         'VEHICLE_CONFIDENCE_THRESHOLD': 0.4,
         'ANIMAL_CONFIDENCE_THRESHOLD': 0.2,
         'WORKING_START_TIME': '00:00',
-        'WORKING_END_TIME': '23:59'
+        'WORKING_END_TIME': '23:59',
+        'ARMED': True
     },
     'user16': {
         'FTP_USER': 'sterkpole',
@@ -233,7 +249,8 @@ USERS = {
         'VEHICLE_CONFIDENCE_THRESHOLD': 0.4,
         'ANIMAL_CONFIDENCE_THRESHOLD': 0.2,
         'WORKING_START_TIME': '00:00',
-        'WORKING_END_TIME': '23:59'
+        'WORKING_END_TIME': '23:59',
+        'ARMED': True
     },
     'user17': {
         'FTP_USER': 'anker',
@@ -246,7 +263,8 @@ USERS = {
         'VEHICLE_CONFIDENCE_THRESHOLD': 0.2,
         'ANIMAL_CONFIDENCE_THRESHOLD': 0.2,
         'WORKING_START_TIME': '00:00',
-        'WORKING_END_TIME': '23:59'
+        'WORKING_END_TIME': '23:59',
+        'ARMED': True
     },
     'user18': {
         'FTP_USER': 'ari',
@@ -260,7 +278,8 @@ USERS = {
         'VEHICLE_CONFIDENCE_THRESHOLD': 0.4,
         'ANIMAL_CONFIDENCE_THRESHOLD': 0.2,
         'WORKING_START_TIME': '19:00',
-        'WORKING_END_TIME': '04:30'
+        'WORKING_END_TIME': '04:30',
+        'ARMED': True
     },
     'user19': {
         'FTP_USER': 'danie',
@@ -273,7 +292,8 @@ USERS = {
         'VEHICLE_CONFIDENCE_THRESHOLD': 0.7,
         'ANIMAL_CONFIDENCE_THRESHOLD': 0.5,
         'WORKING_START_TIME': '00:00',
-        'WORKING_END_TIME': '23:59'
+        'WORKING_END_TIME': '23:59',
+        'ARMED': True
     },
     'user20': {
         'FTP_USER': 'koos',
@@ -286,7 +306,8 @@ USERS = {
         'VEHICLE_CONFIDENCE_THRESHOLD': 0.2,
         'ANIMAL_CONFIDENCE_THRESHOLD': 0.2,
         'WORKING_START_TIME': '00:00',
-        'WORKING_END_TIME': '23:59'
+        'WORKING_END_TIME': '23:59',
+        'ARMED': True
     },
     'user21': {
         'FTP_USER': 'koosboma',
@@ -299,7 +320,8 @@ USERS = {
         'VEHICLE_CONFIDENCE_THRESHOLD': 0.2,
         'ANIMAL_CONFIDENCE_THRESHOLD': 0.2,
         'WORKING_START_TIME': '00:00',
-        'WORKING_END_TIME': '23:59'
+        'WORKING_END_TIME': '23:59',
+        'ARMED': True
     },
     'user22': {
         'FTP_USER': 'zimbi',
@@ -313,7 +335,8 @@ USERS = {
         'ANIMAL_CONFIDENCE_THRESHOLD': 0.2,
         'WORKING_START_TIME': '19:00',
         'WORKING_END_TIME': '06:00',
-        'WATERMARK_TEXT': "Powered by ZimBot"  # User-specific watermark
+        'WATERMARK_TEXT': "Powered by ZimBot",  # User-specific watermark
+        'ARMED': True
     }
 }
 
@@ -324,6 +347,7 @@ USERS = {
 # TELEGRAM_BOT_TOKEN: The API token for your Telegram bot (same for all users).
 # YOLO_MODEL: The filename or path to the YOLOv8 model file.
 # MAX_IMAGE_QUEUE: The maximum number of images that can be queued for processing to prevent memory issues.
+# REDIS_ARMED_KEY_PREFIX: The prefix used for storing the armed status of each user in Redis.
 
 # For each user in the USERS dictionary:
 # FTP_USER: Username for FTP authentication.
@@ -337,3 +361,4 @@ USERS = {
 # ANIMAL_CONFIDENCE_THRESHOLD: The minimum confidence score for an animal detection to be considered valid.
 # WORKING_START_TIME: The time when the system should start processing images for this user (24-hour format).
 # WORKING_END_TIME: The time when the system should stop processing images for this user (24-hour format).
+# ARMED: The default armed status for the user. When armed, images will be processed; when disarmed, images will be discarded.
