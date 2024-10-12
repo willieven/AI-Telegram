@@ -6,7 +6,7 @@ from ultralytics import YOLO
 import telepot
 from telepot.loop import MessageLoop
 import shutil
-from datetime import datetime, time
+from datetime import datetime, timedelta
 import requests
 import time
 import threading
@@ -66,17 +66,14 @@ def set_armed_status(user, status):
 def check_and_auto_arm(user, user_settings):
     current_time = datetime.now().time()
     start_time = datetime.strptime(user_settings['WORKING_START_TIME'], '%H:%M').time()
-    end_time = datetime.strptime(user_settings['WORKING_END_TIME'], '%H:%M').time()
     
-    is_working_hours = False
-    if start_time <= end_time:
-        is_working_hours = start_time <= current_time <= end_time
-    else:  # Working hours go past midnight
-        is_working_hours = current_time >= start_time or current_time <= end_time
+    # Check if current time is exactly the start time (within a small margin)
+    time_difference = datetime.combine(datetime.today(), current_time) - datetime.combine(datetime.today(), start_time)
+    is_start_time = abs(time_difference) <= timedelta(minutes=1)  # 1-minute margin
     
     current_armed_status = get_armed_status(user)
     
-    if is_working_hours and not current_armed_status:
+    if is_start_time and not current_armed_status:
         set_armed_status(user, True)
         message = f"System auto-armed for user {user} as working hours have started."
         logging.info(message)

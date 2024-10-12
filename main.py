@@ -99,7 +99,7 @@ def auto_arm_checker():
     while True:
         for user, user_settings in USERS.items():
             check_and_auto_arm(user, user_settings)
-        time.sleep(60)  # Check every minute
+        time.sleep(30)  # Check every 30 seconds
 
 def start_telegram_handler():
     message_loop = MessageLoop(bot, handle_telegram_command)
