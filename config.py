@@ -34,7 +34,7 @@ USERS = {
         'SIGNL4_SECRET': 'https://connect.signl4.com/webhook/qi773gtvnb',
         'ENABLE_PERSON_DETECTION': True,
         'ENABLE_VEHICLE_DETECTION': False,
-        'ENABLE_ANIMAL_DETECTION': True,
+        'ENABLE_ANIMAL_DETECTION': False,
         'PERSON_CONFIDENCE_THRESHOLD': 0.5,
         'VEHICLE_CONFIDENCE_THRESHOLD': 0.3,
         'ANIMAL_CONFIDENCE_THRESHOLD': 0.2,
@@ -286,10 +286,10 @@ USERS = {
         'FTP_PASS': 'danie1234',
         'TELEGRAM_CHAT_ID': '-1002347900410',
         'ENABLE_PERSON_DETECTION': True,
-        'ENABLE_VEHICLE_DETECTION': True,
+        'ENABLE_VEHICLE_DETECTION': False,
         'ENABLE_ANIMAL_DETECTION': False,
-        'PERSON_CONFIDENCE_THRESHOLD': 0.6,
-        'VEHICLE_CONFIDENCE_THRESHOLD': 0.7,
+        'PERSON_CONFIDENCE_THRESHOLD': 0.7,
+        'VEHICLE_CONFIDENCE_THRESHOLD': 0.9,
         'ANIMAL_CONFIDENCE_THRESHOLD': 0.5,
         'WORKING_START_TIME': '00:00',
         'WORKING_END_TIME': '23:59',
@@ -333,8 +333,8 @@ USERS = {
         'PERSON_CONFIDENCE_THRESHOLD': 0.6,
         'VEHICLE_CONFIDENCE_THRESHOLD': 0.2,
         'ANIMAL_CONFIDENCE_THRESHOLD': 0.2,
-        'WORKING_START_TIME': '19:00',
-        'WORKING_END_TIME': '06:00',
+        'WORKING_START_TIME': '00:00',
+        'WORKING_END_TIME': '23:59',
         'WATERMARK_TEXT': "Powered by ZimBot",  # User-specific watermark
         'ARMED': True
     }

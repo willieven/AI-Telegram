@@ -5,6 +5,7 @@ import numpy as np
 from ultralytics import YOLO
 import telepot
 from telepot.loop import MessageLoop
+from telepot.namedtuple import ReplyKeyboardMarkup, KeyboardButton
 import shutil
 from datetime import datetime, timedelta
 import requests
@@ -75,12 +76,18 @@ def check_and_auto_arm(user, user_settings):
     
     if is_start_time and not current_armed_status:
         set_armed_status(user, True)
-        message = f"System auto-armed for user {user} as working hours have started."
+        message = f"System auto-armed for user as working hours have started."
         logging.info(message)
         bot.sendMessage(user_settings['TELEGRAM_CHAT_ID'], message)
         return True
     
     return False
+
+def create_telegram_keyboard():
+    return ReplyKeyboardMarkup(keyboard=[
+        [KeyboardButton(text='/arm'), KeyboardButton(text='/disarm')],
+        [KeyboardButton(text='/status'), KeyboardButton(text='/autoarm')]
+    ])
 
 def handle_telegram_command(msg):
     content_type, chat_type, chat_id = telepot.glance(msg)
@@ -95,22 +102,26 @@ def handle_telegram_command(msg):
         bot.sendMessage(chat_id, "Unauthorized user.")
         return
 
-    if command == '/arm':
+    keyboard = create_telegram_keyboard()
+
+    if command == '/start':
+        bot.sendMessage(chat_id, "Welcome, Use the keyboard to control the system.", reply_markup=keyboard)
+    elif command == '/arm':
         set_armed_status(user, True)
-        bot.sendMessage(chat_id, "System armed. Images will be processed.")
+        bot.sendMessage(chat_id, "System armed.", reply_markup=keyboard)
     elif command == '/disarm':
         set_armed_status(user, False)
-        bot.sendMessage(chat_id, "System disarmed. Images will be discarded.")
+        bot.sendMessage(chat_id, "System disarmed.", reply_markup=keyboard)
     elif command == '/status':
         status = "armed" if get_armed_status(user) else "disarmed"
-        bot.sendMessage(chat_id, f"System is currently {status}.")
+        bot.sendMessage(chat_id, f"System is currently {status}.", reply_markup=keyboard)
     elif command == '/autoarm':
         if check_and_auto_arm(user, USERS[user]):
-            bot.sendMessage(chat_id, "System has been auto-armed as it's within working hours.")
+            bot.sendMessage(chat_id, "System has been auto-armed as it's within working hours.", reply_markup=keyboard)
         else:
-            bot.sendMessage(chat_id, "Auto-arm check performed, but no action was needed.")
+            bot.sendMessage(chat_id, "Auto-arm check performed, but no action was needed.", reply_markup=keyboard)
     else:
-        bot.sendMessage(chat_id, "Unknown command. Available commands: /arm, /disarm, /status, /autoarm")
+        bot.sendMessage(chat_id, "Unknown command. Use the keyboard to control the system.", reply_markup=keyboard)
 
 def add_watermark(image, user_settings):
     height, width = image.shape[:2]
@@ -337,6 +348,14 @@ MessageLoop(bot, handle_telegram_command).run_as_thread()
 if __name__ == "__main__":
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     logging.info("Image processor initialized and ready.")
+    
+    # Send a welcome message to all users with the keyboard
+    for user, user_data in USERS.items():
+        try:
+            keyboard = create_telegram_keyboard()
+            bot.sendMessage(user_data['TELEGRAM_CHAT_ID'], "AI-Telegram Bot is online. Use the keyboard to control the system.", reply_markup=keyboard)
+        except Exception as e:
+            logging.error(f"Failed to send welcome message to user {user}: {str(e)}")
     
     # Keep the script running
     while True:
