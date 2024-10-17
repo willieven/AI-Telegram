@@ -4,3 +4,4 @@ ultralytics
 telepot
 requests
 redis
+pyftpdlib

@@ -1,8 +1,6 @@
-# AI-Telegram
+# AI-Telegram FTP Server Installation Instructions
 
-# Ubuntu Installation Guide for AI-Telegram FTP Server
-
-This guide provides step-by-step instructions for installing and configuring the AI-Telegram FTP Server with image processing capabilities on a fresh Ubuntu server.
+Follow these step-by-step instructions to install the AI-Telegram FTP Server on your Ubuntu system.
 
 ## Prerequisites
 
@@ -12,162 +10,91 @@ This guide provides step-by-step instructions for installing and configuring the
 
 ## Installation Steps
 
-1. **Update the system**
+1. **Create the installation script**
+
+   First, create a new file named `install_ai_telegram.sh` in your home directory or any directory where you have write permissions.
 
    ```bash
-   sudo apt update && sudo apt upgrade -y
+   nano install_ai_telegram.sh
    ```
 
-2. **Install required system dependencies**
+   Copy and paste the entire installation script into this file. The script content should be the same as the one provided in the "Ubuntu One-Click Installation Script for AI-Telegram FTP Server" artifact.
+
+   After pasting the script, save the file and exit the text editor. In nano, you can do this by pressing `Ctrl+X`, then `Y`, and finally `Enter`.
+
+2. **Make the script executable**
+
+   To make the installation script executable, run the following command:
 
    ```bash
-   sudo apt install -y python3 python3-pip git libgl1-mesa-glx libglib2.0-0 redis-server
+   chmod +x install_ai_telegram.sh
    ```
 
-3. **Clone the repository**
+   This command gives the script execution permissions, allowing you to run it.
+
+3. **Run the script with sudo**
+
+   Execute the installation script with sudo privileges using the following command:
 
    ```bash
-   sudo git clone https://github.com/yourusername/AI-Telegram.git /opt/ftp-server
-   cd /opt/ftp-server
+   sudo ./install_ai_telegram.sh
    ```
 
-4. **Install Python dependencies**
+   This will start the installation process. The script will prompt you for necessary information during the installation.
 
+4. **Follow the prompts**
+
+   During the installation, you'll be asked to provide the following information:
+   - A strong password for Redis
+   - Your Telegram Bot Token
+
+   Make sure to have this information ready before starting the installation.
+
+5. **Wait for the installation to complete**
+
+   The script will update your system, install dependencies, configure the server, and start the AI-Telegram FTP service. This process may take several minutes.
+
+6. **Post-installation steps**
+
+   After the script finishes, you'll need to:
+   
+   a. Update the USERS dictionary in the configuration file:
+      ```bash
+      sudo nano /opt/ftp-server/config.py
+      ```
+      Find the USERS dictionary and update it with your user configurations.
+
+   b. Restart the service to apply changes:
+      ```bash
+      sudo systemctl restart ai-telegram-ftp.service
+      ```
+
+7. **Verify the installation**
+
+   Check if the service is running:
    ```bash
-   sudo pip3 install -r requirements.txt
+   sudo systemctl status ai-telegram-ftp.service
    ```
 
-5. **Configure the application**
+   You should see that the service is active and running.
 
-   Edit the `config.py` file to set up your FTP users, Telegram bot token, and other settings:
+8. **Check the logs**
 
+   If you encounter any issues or want to monitor the server's activity, check the logs:
    ```bash
-   sudo nano /opt/ftp-server/config.py
-   ```
-
-   Make sure to update the following:
-   - `TELEGRAM_BOT_TOKEN`
-   - `USERS` dictionary with your user configurations
-   - `REDIS_PASSWORD` (generate a strong password)
-
-6. **Set up Redis**
-
-   Edit the Redis configuration file:
-
-   ```bash
-   sudo nano /etc/redis/redis.conf
-   ```
-
-   Find the `# requirepass foobared` line and replace it with:
-
-   ```
-   requirepass your_strong_password_here
-   ```
-
-   Restart Redis:
-
-   ```bash
-   sudo systemctl restart redis-server
-   ```
-
-7. **Create necessary directories**
-
-   ```bash
-   sudo mkdir -p /opt/ftp-server/FTP /opt/ftp-server/positive_photos /opt/ftp-server/logs
-   sudo chmod 755 /opt/ftp-server/FTP /opt/ftp-server/positive_photos /opt/ftp-server/logs
-   ```
-
-8. **Download YOLO model**
-
-   ```bash
-   sudo wget https://github.com/ultralytics/assets/releases/download/v0.0.0/yolov8l.pt -O /opt/ftp-server/yolov8l.pt
-   ```
-
-9. **Create a systemd service file**
-
-   ```bash
-   sudo nano /etc/systemd/system/ai-telegram-ftp.service
-   ```
-
-   Add the following content:
-
-   ```ini
-   [Unit]
-   Description=AI-Telegram FTP Server
-   After=network.target
-
-   [Service]
-   ExecStart=/usr/bin/python3 /opt/ftp-server/main.py
-   WorkingDirectory=/opt/ftp-server
-   Restart=always
-   User=root
-   Group=root
-   Environment=PATH=/usr/bin:/usr/local/bin
-   Environment=PYTHONUNBUFFERED=1
-   StandardOutput=append:/opt/ftp-server/logs/ai-telegram-ftp.log
-   StandardError=append:/opt/ftp-server/logs/ai-telegram-ftp.log
-
-   [Install]
-   WantedBy=multi-user.target
-   ```
-
-10. **Enable and start the service**
-
-    ```bash
-    sudo systemctl daemon-reload
-    sudo systemctl enable ai-telegram-ftp.service
-    sudo systemctl start ai-telegram-ftp.service
-    ```
-
-11. **Check the service status**
-
-    ```bash
-    sudo systemctl status ai-telegram-ftp.service
-    ```
-
-12. **Monitor the logs**
-
-    ```bash
-    sudo tail -f /opt/ftp-server/logs/ai-telegram-ftp.log
-    ```
-
-## Firewall Configuration
-
-If you're using UFW (Uncomplicated Firewall), allow the FTP port:
-
-```bash
-sudo ufw allow 2121/tcp
-```
-
-## Updating the Application
-
-To update the application in the future:
-
-1. Stop the service:
-   ```bash
-   sudo systemctl stop ai-telegram-ftp.service
-   ```
-
-2. Pull the latest changes:
-   ```bash
-   cd /opt/ftp-server
-   sudo git pull
-   ```
-
-3. Install any new dependencies:
-   ```bash
-   sudo pip3 install -r requirements.txt
-   ```
-
-4. Start the service:
-   ```bash
-   sudo systemctl start ai-telegram-ftp.service
+   sudo tail -f /opt/ftp-server/logs/ai-telegram-ftp.log
    ```
 
 ## Troubleshooting
 
-- If you encounter any issues, check the logs at `/opt/ftp-server/logs/ai-telegram-ftp.log`
-- Ensure all paths in the `config.py` file are correct
-- Verify that the Redis password in `config.py` matches the one set in `/etc/redis/redis.conf`
+- If you encounter any permission issues, make sure you're running the script with sudo.
+- If the service fails to start, check the logs for any error messages.
+- Ensure that your firewall allows traffic on port 2121 (or whichever port you've configured for FTP).
 
-For any persistent issues, please refer to the project's GitHub issues page or contact the maintainer.
+## Security Notes
+
+- Always use strong, unique passwords for Redis and FTP users.
+- Regularly update your system and the AI-Telegram FTP Server to ensure you have the latest security patches.
+- Consider using a firewall to restrict access to your server.
+
+For any persistent issues or questions, please refer to the project's documentation or contact the maintainer.

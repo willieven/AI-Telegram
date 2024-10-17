@@ -18,7 +18,7 @@ apt-get install -y python3 python3-pip git libgl1-mesa-glx libglib2.0-0 redis-se
 
 # Clone the repository
 echo "Cloning the repository..."
-git clone https://github.com/yourusername/AI-Telegram.git /opt/ftp-server
+git clone https://github.com/willieven/AI-Telegram.git /opt/ftp-server
 cd /opt/ftp-server
 
 # Install Python dependencies
