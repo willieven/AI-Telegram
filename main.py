@@ -4,12 +4,12 @@ import logging
 from logging.handlers import TimedRotatingFileHandler
 import signal
 from datetime import datetime
+import concurrent.futures
 
 from config import USERS, FTP_HOST, FTP_PORT, MAIN_FTP_DIRECTORY, MAX_IMAGE_QUEUE, POSITIVE_PHOTOS_DIRECTORY
 from ftp_server import create_ftp_server
 from improved_image_processor import start_image_processing_system, shutdown_image_processing
 from image_processor import bot, handle_telegram_command, check_and_auto_arm, redis_client, set_armed_status
-from nvr_api_handler import start_nvr_processing
 
 # Number of image processing threads
 NUM_IMAGE_PROCESSING_THREADS = 12
@@ -126,7 +126,9 @@ async def main():
     
     # Create and start the FTP server
     ftp_server = create_ftp_server(FTP_HOST, FTP_PORT, image_queue)
-    ftp_server_task = asyncio.create_task(ftp_server.start())
+    loop = asyncio.get_running_loop()
+    with concurrent.futures.ThreadPoolExecutor() as pool:
+        ftp_server_task = loop.run_in_executor(pool, ftp_server.run)
     logger.info(f"FTP server is starting on {FTP_HOST}:{FTP_PORT}")
     
     # Create error_images directory
@@ -144,10 +146,6 @@ async def main():
     # Start the auto-arm checker
     auto_arm_task = asyncio.create_task(auto_arm_checker())
     logger.info("Auto-arm checker started")
-    
-    # Start the NVR event processing
-    nvr_task = asyncio.create_task(start_nvr_processing(image_queue))
-    logger.info("NVR event processing started")
 
     # Setup graceful shutdown
     stop_event = asyncio.Event()
@@ -159,14 +157,13 @@ async def main():
         await stop_event.wait()
     finally:
         logger.info("Shutting down...")
-        ftp_server_task.cancel()
+        ftp_server.stop()  # Assuming there's a stop method, if not, we might need to add one
         telegram_task.cancel()
         auto_arm_task.cancel()
-        nvr_task.cancel()
         shutdown_image_processing(stop_event)
         
         # Wait for tasks to complete
-        await asyncio.gather(ftp_server_task, telegram_task, auto_arm_task, nvr_task, return_exceptions=True)
+        await asyncio.gather(telegram_task, auto_arm_task, return_exceptions=True)
         
         logger.info("Cleanup complete. Exiting.")
 
