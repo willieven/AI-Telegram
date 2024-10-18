@@ -1,15 +1,15 @@
 import os
-import time
-from threading import Thread
-from logging.handlers import TimedRotatingFileHandler
+import asyncio
 import logging
-import sqlite3
+from logging.handlers import TimedRotatingFileHandler
+import signal
+from datetime import datetime
 
 from config import USERS, FTP_HOST, FTP_PORT, MAIN_FTP_DIRECTORY, MAX_IMAGE_QUEUE, POSITIVE_PHOTOS_DIRECTORY
 from ftp_server import create_ftp_server
 from improved_image_processor import start_image_processing_system, shutdown_image_processing
-from telepot.loop import MessageLoop
 from image_processor import bot, handle_telegram_command, check_and_auto_arm, redis_client, set_armed_status
+from nvr_api_handler import start_nvr_processing
 
 # Number of image processing threads
 NUM_IMAGE_PROCESSING_THREADS = 12
@@ -31,31 +31,12 @@ def setup_logging():
         os.makedirs(log_dir, exist_ok=True)
         log_file = os.path.join(log_dir, 'ftp_server.log')
 
-        # Subclass TimedRotatingFileHandler to add size limit
-        class SizedTimedRotatingFileHandler(TimedRotatingFileHandler):
-            def __init__(self, *args, **kwargs):
-                self.max_bytes = kwargs.pop("maxBytes", 0)
-                TimedRotatingFileHandler.__init__(self, *args, **kwargs)
-
-            def shouldRollover(self, record):
-                if self.max_bytes > 0:
-                    msg = "%s\n" % self.format(record)
-                    self.stream.seek(0, 2)  #due to non-posix-compliant Windows feature
-                    if self.stream.tell() + len(msg) >= self.max_bytes:
-                        return 1
-                t = int(time.time())
-                if t >= self.rolloverAt:
-                    return 1
-                return 0
-
-        # Use our custom handler with a 10MB size limit
-        file_handler = SizedTimedRotatingFileHandler(
+        file_handler = TimedRotatingFileHandler(
             filename=log_file,
-            when="H",
+            when="midnight",
             interval=1,
-            backupCount=0,
-            encoding='utf-8',
-            maxBytes=10*1024*1024  # 10 MB size limit
+            backupCount=7,
+            encoding='utf-8'
         )
         file_handler.setLevel(logging.DEBUG)
         file_formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
@@ -77,7 +58,7 @@ def create_user_directories():
         os.makedirs(user_directory, exist_ok=True)
         logger.info(f"Created or verified directory for user {user_data['FTP_USER']}: {user_directory}")
 
-def process_leftover_images(image_queue):
+async def process_leftover_images(image_queue):
     leftover_images = []
     for user_id, user_data in USERS.items():
         user_directory = os.path.join(MAIN_FTP_DIRECTORY, user_id)
@@ -85,28 +66,39 @@ def process_leftover_images(image_queue):
             for file in files:
                 if file.lower().endswith(('.png', '.jpg', '.jpeg', '.gif')):
                     file_path = os.path.join(root, file)
-                    leftover_images.append((file_path, user_data, True))  # Add True for delete_after_processing
+                    leftover_images.append((file_path, user_data, True))
                     logger.info(f"Found leftover image: {file_path}")
     
     if leftover_images:
         for image in leftover_images:
-            image_queue.put(image)
+            await image_queue.put(image)
         logger.info(f"Queued {len(leftover_images)} leftover images for processing")
     else:
         logger.info("No leftover images found")
 
-def auto_arm_checker():
+async def auto_arm_checker():
     while True:
         for user, user_settings in USERS.items():
             check_and_auto_arm(user, user_settings)
-        time.sleep(30)  # Check every 30 seconds
+        await asyncio.sleep(30)  # Check every 30 seconds
 
-def start_telegram_handler():
-    message_loop = MessageLoop(bot, handle_telegram_command)
-    message_loop_thread = Thread(target=message_loop.run_forever, name="TelegramBot")
-    message_loop_thread.daemon = True
-    message_loop_thread.start()
-    return message_loop_thread
+async def start_telegram_handler():
+    async def message_loop_handler():
+        offset = 0
+        while True:
+            try:
+                updates = await bot.get_updates(offset=offset, timeout=10)
+                for update in updates:
+                    offset = update['update_id'] + 1
+                    if 'message' in update:
+                        await handle_telegram_command(update['message'])
+            except Exception as e:
+                logger.error(f"Error in Telegram message loop: {str(e)}")
+                await asyncio.sleep(1)
+
+    telegram_task = asyncio.create_task(message_loop_handler())
+    logger.info("Telegram message handler started")
+    return telegram_task
 
 def initialize_redis_armed_status():
     for user, user_settings in USERS.items():
@@ -114,7 +106,7 @@ def initialize_redis_armed_status():
             set_armed_status(user, user_settings['ARMED'])
             logger.info(f"Initialized armed status for user {user} in Redis")
 
-def main():
+async def main():
     # Create main FTP directory if it doesn't exist
     os.makedirs(MAIN_FTP_DIRECTORY, exist_ok=True)
     logger.info(f"Main FTP directory verified: {MAIN_FTP_DIRECTORY}")
@@ -130,12 +122,12 @@ def main():
     logger.info(f"Image processing system started with {NUM_IMAGE_PROCESSING_THREADS} threads")
     
     # Process any leftover images in user folders
-    process_leftover_images(image_queue)
+    await process_leftover_images(image_queue)
     
     # Create and start the FTP server
-    server = create_ftp_server(FTP_HOST, FTP_PORT, image_queue)
+    ftp_server = create_ftp_server(FTP_HOST, FTP_PORT, image_queue)
+    ftp_server_task = asyncio.create_task(ftp_server.start())
     logger.info(f"FTP server is starting on {FTP_HOST}:{FTP_PORT}")
-    server.start()  # This starts the server in its own thread
     
     # Create error_images directory
     error_images_dir = os.path.join(MAIN_FTP_DIRECTORY, 'error_images')
@@ -147,27 +139,36 @@ def main():
     logger.info(f"Positive photos directory verified: {POSITIVE_PHOTOS_DIRECTORY}")
     
     # Start the Telegram message handler
-    telegram_thread = start_telegram_handler()
-    logger.info("Telegram message handler started")
+    telegram_task = await start_telegram_handler()
     
     # Start the auto-arm checker
-    auto_arm_thread = Thread(target=auto_arm_checker, name="AutoArmChecker")
-    auto_arm_thread.daemon = True
-    auto_arm_thread.start()
+    auto_arm_task = asyncio.create_task(auto_arm_checker())
     logger.info("Auto-arm checker started")
     
-    logger.info("Main thread is now waiting. Press Ctrl+C to stop the server.")
+    # Start the NVR event processing
+    nvr_task = asyncio.create_task(start_nvr_processing(image_queue))
+    logger.info("NVR event processing started")
+
+    # Setup graceful shutdown
+    stop_event = asyncio.Event()
+    loop = asyncio.get_running_loop()
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        loop.add_signal_handler(sig, stop_event.set)
+    
     try:
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        logger.info("Server stopping...")
-        shutdown_image_processing(stop_event)
-        # Note: We're not explicitly stopping the FTP server here because
-        # the implementation doesn't seem to provide a stop method.
-        # The process termination should stop it.
+        await stop_event.wait()
     finally:
+        logger.info("Shutting down...")
+        ftp_server_task.cancel()
+        telegram_task.cancel()
+        auto_arm_task.cancel()
+        nvr_task.cancel()
+        shutdown_image_processing(stop_event)
+        
+        # Wait for tasks to complete
+        await asyncio.gather(ftp_server_task, telegram_task, auto_arm_task, nvr_task, return_exceptions=True)
+        
         logger.info("Cleanup complete. Exiting.")
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

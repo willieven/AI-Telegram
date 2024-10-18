@@ -43,12 +43,17 @@ def set_last_alert_time(user, timestamp):
 
 def ensure_single_instance():
     global lock_file
-    lock_file = open("/tmp/ai_telegram_lock", "w")
+    lock_file_path = "/tmp/ai_telegram_lock"
+    lock_file = open(lock_file_path, "w")
     try:
         fcntl.lockf(lock_file, fcntl.LOCK_EX | fcntl.LOCK_NB)
     except IOError:
         print("Another instance is already running. Exiting.")
         sys.exit(1)
+    
+    # Write PID to the lock file
+    lock_file.write(str(os.getpid()))
+    lock_file.flush()
 
 def get_armed_status(user):
     key = f"{REDIS_ARMED_KEY_PREFIX}{user}"
@@ -338,16 +343,32 @@ def save_positive_photo(image_path, username):
     except Exception as e:
         logging.error(f"Error saving original image with positive detection: {str(e)}")
 
-# Ensure single instance is running
-ensure_single_instance()
+def message_handler(msg):
+    content_type, chat_type, chat_id = telepot.glance(msg)
+    if content_type == 'text':
+        handle_telegram_command(msg)
 
-# Start Telegram message handler
-MessageLoop(bot, handle_telegram_command).run_as_thread()
+def run_telegram_bot():
+    global bot
+    bot = telepot.Bot(TELEGRAM_BOT_TOKEN)
+    
+    # Remove any existing webhook
+    bot.deleteWebhook()
+    
+    # Wait a bit to ensure the webhook is deleted
+    time.sleep(1)
+    
+    # Start the message loop
+    MessageLoop(bot, message_handler).run_as_thread()
+    logging.info("Telegram bot started successfully")
 
-# If this script is run directly, you might want to add some initialization or testing code here
-if __name__ == "__main__":
+def main():
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-    logging.info("Image processor initialized and ready.")
+    logging.info("Initializing AI-Telegram Bot")
+
+    ensure_single_instance()
+    
+    run_telegram_bot()
     
     # Send a welcome message to all users with the keyboard
     for user, user_data in USERS.items():
@@ -357,6 +378,22 @@ if __name__ == "__main__":
         except Exception as e:
             logging.error(f"Failed to send welcome message to user {user}: {str(e)}")
     
+    # Start the auto-arm checker
+    def auto_arm_checker():
+        while True:
+            for user, user_settings in USERS.items():
+                check_and_auto_arm(user, user_settings)
+            time.sleep(60)  # Check every minute
+
+    auto_arm_thread = threading.Thread(target=auto_arm_checker)
+    auto_arm_thread.daemon = True
+    auto_arm_thread.start()
+    
+    logging.info("AI-Telegram Bot initialization complete")
+
     # Keep the script running
     while True:
         time.sleep(10)
+
+if __name__ == "__main__":
+    main()

@@ -23,7 +23,7 @@ cd /opt/ftp-server
 
 # Install Python dependencies
 echo "Installing Python dependencies..."
-pip3 install -r requirements.txt
+pip3 install --no-cache-dir -r requirements.txt
 
 # Download YOLO model
 echo "Downloading YOLO model..."

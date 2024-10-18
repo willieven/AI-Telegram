@@ -40,7 +40,17 @@ USERS = {
         'ANIMAL_CONFIDENCE_THRESHOLD': 0.2,
         'WORKING_START_TIME': '19:00',
         'WORKING_END_TIME': '05:00',
-        'ARMED': True  # Default armed status
+        'ARMED': True,  # Default armed status
+        'NVR_DEVICES': [
+            {
+                'type': 'hikvision',
+                'ip': 'kantoor.spoorvat.co.za',
+                'port': 8095,
+                'username': 'admin',
+                'password': 'Werianip1',
+                'stream': 'main'
+            }
+        ]
     },
     'user2': {
         'FTP_USER': 'naboom',
@@ -325,7 +335,7 @@ USERS = {
     },
     'user22': {
         'FTP_USER': 'zimbi',
-        'FTP_PASS': 'zimbi123',
+        'FTP_PASS': 'Werianip1',
         'TELEGRAM_CHAT_ID': '-1002389227208',
         'ENABLE_PERSON_DETECTION': True,
         'ENABLE_VEHICLE_DETECTION': False,
@@ -362,3 +372,23 @@ USERS = {
 # WORKING_START_TIME: The time when the system should start processing images for this user (24-hour format).
 # WORKING_END_TIME: The time when the system should stop processing images for this user (24-hour format).
 # ARMED: The default armed status for the user. When armed, images will be processed; when disarmed, images will be discarded.
+
+# NVR/DVR
+#     'NVR_DEVICES': [
+#            {
+#                'type': 'hikvision',
+#                'ip': '192.168.1.100',
+#                'port': 80,
+#                'username': 'admin',
+#                'password': 'password123',
+#                'stream': 'main'
+#            },
+#            {
+#                'type': 'dahua',
+#                'ip': '192.168.1.101',
+#                'port': 80,
+#                'username': 'admin',
+#                'password': 'password456',
+#                'stream': 'sub'
+#            }
+#        ]
